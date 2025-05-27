@@ -604,4 +604,13 @@ body {
     margin: 0;
     padding: 1em 1em 1em 1em;
   }
+    .genre-tag-clickable:hover,
+  .genre-tag-clickable:active {
+    background: #e0e7ef !important;
+    color: #333 !important;
+  }
+  .genre-tag-clickable.genre-tag-active {
+    background: #ffe066 !important;
+    color: #22223b !important;
+  }
 }
