@@ -20,6 +20,81 @@ const TMDB_GENRES = {
   37: "Western"
 };
 
+window.activeGenreName = null;
+
+// Centralized genre tag handler
+function setupGenreTagHandlers(cy) {
+  document.querySelectorAll('.genre-tag-clickable').forEach(tag => {
+    tag.onclick = function() {
+      const genre = this.getAttribute('data-genre');
+      const wasActive = this.classList.contains('genre-tag-active');
+
+      // Remove active state from all tags
+      document.querySelectorAll('.genre-tag-clickable').forEach(other => {
+        other.classList.remove('genre-tag-active');
+      });
+
+      // Remove genre highlight from all nodes
+      cy.nodes().removeClass('node-genre-highlight');
+
+      if (!wasActive) {
+        window.activeGenreName = genre;
+        // Activate all tags with this genre
+        document.querySelectorAll(`.genre-tag-clickable[data-genre="${genre}"]`).forEach(tag2 => {
+          tag2.classList.add('genre-tag-active');
+        });
+
+        // Highlight all show nodes with this genre
+        const matchingNodes = cy.nodes('[type="show"]').filter(node =>
+          (node.data('genres') || []).includes(genre)
+        );
+        matchingNodes.addClass('node-genre-highlight');
+
+        // Dim non-matching nodes
+        cy.nodes('[type="show"]').forEach(node => {
+          if ((node.data('genres') || []).includes(genre)) {
+            node.removeClass('dimmed');
+          } else {
+            node.addClass('dimmed');
+          }
+        });
+        cy.edges().addClass('dimmed');
+        matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
+
+        // Zoom and fit to the matching nodes' neighbourhood
+        if (matchingNodes.length > 0) {
+          cy.animate({
+            fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
+          }, { duration: 500, easing: 'ease-in-out-cubic' });
+        }
+      } else {
+        window.activeGenreName = null;
+        cy.nodes().removeClass('node-genre-highlight');
+        cy.elements().addClass('dimmed');
+        let targetNode = null;
+        if (window.lastActiveNodeId) {
+          targetNode = cy.getElementById(window.lastActiveNodeId);
+        }
+        if (!targetNode || !targetNode.length) {
+          targetNode = cy.nodes('.origin-show');
+        }
+        if (targetNode && targetNode.length) {
+          const neighborhood = targetNode.closedNeighborhood();
+          neighborhood.removeClass('dimmed');
+          targetNode.removeClass('dimmed');
+        }
+      }
+    };
+  });
+
+  // After (re)rendering genre tags, re-apply the active state
+  if (window.activeGenreName) {
+    document.querySelectorAll(`.genre-tag-clickable[data-genre="${window.activeGenreName}"]`).forEach(tag => {
+      tag.classList.add('genre-tag-active');
+    });
+  }
+}
+
 async function fetchWritersForShow(name) {
   const sr = await fetch(
     `https://api.themoviedb.org/3/search/tv?api_key=${apiKey}&query=${encodeURIComponent(name)}`
@@ -442,23 +517,34 @@ async function renderGraph(show, writers, creatorIds) {
     const originNode = cy.nodes('[id = "show_' + show.id + '"]');
     if (originNode.nonempty()) {
       cy.resize();
-      cy.animate({
-        fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
-      }, { duration: 500, easing: 'ease-in-out-cubic' });
+      if (!window.activeGenreName) {
+        cy.animate({
+          fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
+        }, { duration: 500, easing: 'ease-in-out-cubic' });
 
-      const neighborhood = originNode.closedNeighborhood();
-      cy.elements().addClass('dimmed');
-      neighborhood.removeClass('dimmed');
+        const neighborhood = originNode.closedNeighborhood();
+        cy.elements().addClass('dimmed');
+        neighborhood.removeClass('dimmed');
 
-      // After animation, check if centered and re-center if not
-      setTimeout(() => {
-        if (!isOriginNodeCentered(cy, originNode)) {
-          cy.resize();
-          cy.animate({
-            fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
-          }, { duration: 400, easing: 'ease-in-out-cubic' });
-        }
-      }, 600); // Wait for the initial animation to finish
+        setTimeout(() => {
+          if (!isOriginNodeCentered(cy, originNode)) {
+            cy.resize();
+            cy.animate({
+              fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
+            }, { duration: 400, easing: 'ease-in-out-cubic' });
+          }
+        }, 600);
+      } else {
+        // If a genre is active, after genre fit, check if origin node is centered
+        setTimeout(() => {
+          if (!isOriginNodeCentered(cy, originNode)) {
+            cy.resize();
+            cy.animate({
+              fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
+            }, { duration: 400, easing: 'ease-in-out-cubic' });
+          }
+        }, 600);
+      }
     }
   });
 
@@ -579,76 +665,40 @@ async function renderGraph(show, writers, creatorIds) {
     tag.onclick = null;
   });
 
-  // Add new click handlers
-  document.querySelectorAll('.genre-tag-clickable').forEach(tag => {
-    tag.onclick = function() {
-      const genre = this.getAttribute('data-genre');
-      const wasActive = this.classList.contains('genre-tag-active');
+  // Set up handlers and restore active state
+  setupGenreTagHandlers(cy);
 
-      // Remove active state from all tags (both title bar and popover)
-      document.querySelectorAll('.genre-tag-clickable').forEach(other => {
-        other.classList.remove('genre-tag-active');
-      });
+  // --- Apply genre highlight if a genre is active ---
+  if (window.activeGenreName) {
+    // Activate all tags with this genre
+    document.querySelectorAll(`.genre-tag-clickable[data-genre="${window.activeGenreName}"]`).forEach(tag => {
+      tag.classList.add('genre-tag-active');
+    });
 
-      // Remove genre highlight from all nodes
-      cy.nodes().removeClass('node-genre-highlight');
+    // Highlight all show nodes with this genre
+    const matchingNodes = cy.nodes('[type="show"]').filter(node =>
+      (node.data('genres') || []).includes(window.activeGenreName)
+    );
+    matchingNodes.addClass('node-genre-highlight');
 
-      if (!wasActive) {
-        // Activate this tag in popover
-        this.classList.add('genre-tag-active');
-        // Also activate in title bar if present
-        document.querySelectorAll('#origin-series .genre-tag-clickable').forEach(tag2 => {
-          if (tag2.getAttribute('data-genre') === genre) {
-            tag2.classList.add('genre-tag-active');
-          }
-        });
-
-        // Highlight all show nodes with this genre
-        const matchingNodes = cy.nodes('[type="show"]').filter(node =>
-          (node.data('genres') || []).includes(genre)
-        );
-        matchingNodes.addClass('node-genre-highlight');
-
-        // Dim non-matching nodes
-        cy.nodes('[type="show"]').forEach(node => {
-          if ((node.data('genres') || []).includes(genre)) {
-            node.removeClass('dimmed');
-          } else {
-            node.addClass('dimmed');
-          }
-        });
-        cy.edges().addClass('dimmed');
-        matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
-
-        // Zoom and fit to the matching nodes' neighbourhood
-        if (matchingNodes.length > 0) {
-          cy.animate({
-            fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
-          }, { duration: 500, easing: 'ease-in-out-cubic' });
-        }
+    // Dim non-matching nodes
+    cy.nodes('[type="show"]').forEach(node => {
+      if ((node.data('genres') || []).includes(window.activeGenreName)) {
+        node.removeClass('dimmed');
       } else {
-        // All tags are now inactive, so show only the last active node's neighborhood, or origin show if none
-        cy.nodes().removeClass('node-genre-highlight');
-        cy.elements().addClass('dimmed');
-        let targetNode = null;
-        if (window.lastActiveNodeId) {
-          targetNode = cy.getElementById(window.lastActiveNodeId);
-        }
-        if (!targetNode || !targetNode.length) {
-          // Fallback to origin show
-          targetNode = cy.nodes('.origin-show');
-        }
-        if (targetNode && targetNode.length) {
-          // Undim the node itself and its closed neighborhood (nodes + edges)
-          const neighborhood = targetNode.closedNeighborhood();
-          neighborhood.removeClass('dimmed');
-          targetNode.removeClass('dimmed');
-        }
+        node.addClass('dimmed');
       }
-    };
-  });
+    });
+    cy.edges().addClass('dimmed');
+    matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
 
-  // ... rest of your renderGraph code ...
+    // Zoom and fit to the matching nodes' neighbourhood
+    if (matchingNodes.length > 0) {
+      cy.animate({
+        fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
+      }, { duration: 500, easing: 'ease-in-out-cubic' });
+    }
+  }
 }
 
 function updateOriginHeader(show, writers, writerIdxToNodeId) {
@@ -1104,84 +1154,9 @@ async function showShowPopover(showId, node, cy) {
       popover.style.transform = '';
     }
 
-        // After setting #popover-genres.innerHTML = genresHtml;
-    const activeGenre = document.querySelector('.genre-tag-clickable.genre-tag-active');
-    if (activeGenre) {
-      const activeGenreName = activeGenre.getAttribute('data-genre');
-      document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
-        if (tag.getAttribute('data-genre') === activeGenreName) {
-          tag.classList.add('genre-tag-active');
-        }
-      });
-    }
-        // Add click handler for popover genre tags
-        document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
-      tag.onclick = function() {
-        const genre = this.getAttribute('data-genre');
-        const wasActive = this.classList.contains('genre-tag-active');
-    
-        // Remove active state from all tags (both title bar and popover)
-        document.querySelectorAll('.genre-tag-clickable').forEach(other => {
-          other.classList.remove('genre-tag-active');
-        });
-    
-        // Remove genre highlight from all nodes
-        cy.nodes().removeClass('node-genre-highlight');
-    
-        if (!wasActive) {
-          // Activate this tag in popover
-          this.classList.add('genre-tag-active');
-          // Also activate in title bar if present
-          document.querySelectorAll('#origin-series .genre-tag-clickable').forEach(tag2 => {
-            if (tag2.getAttribute('data-genre') === genre) {
-              tag2.classList.add('genre-tag-active');
-            }
-          });
-    
-          // Highlight all show nodes with this genre
-          const matchingNodes = cy.nodes('[type="show"]').filter(node =>
-            (node.data('genres') || []).includes(genre)
-          );
-          matchingNodes.addClass('node-genre-highlight');
-    
-          // Dim non-matching nodes
-          cy.nodes('[type="show"]').forEach(node => {
-            if ((node.data('genres') || []).includes(genre)) {
-              node.removeClass('dimmed');
-            } else {
-              node.addClass('dimmed');
-            }
-          });
-          cy.edges().addClass('dimmed');
-          matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
-    
-          // Zoom and fit to the matching nodes' neighbourhood
-          if (matchingNodes.length > 0) {
-            cy.animate({
-              fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
-            }, { duration: 500, easing: 'ease-in-out-cubic' });
-          }
-        } else {
-          // All tags are now inactive, so show only the last active node's neighborhood, or origin show if none
-          cy.nodes().removeClass('node-genre-highlight');
-          cy.elements().addClass('dimmed');
-          let targetNode = null;
-          if (window.lastActiveNodeId) {
-            targetNode = cy.getElementById(window.lastActiveNodeId);
-          }
-          if (!targetNode || !targetNode.length) {
-            // Fallback to origin show
-            targetNode = cy.nodes('.origin-show');
-          }
-          if (targetNode && targetNode.length) {
-            // Undim the node itself and its closed neighborhood (nodes + edges)
-            const neighborhood = targetNode.closedNeighborhood();
-            neighborhood.removeClass('dimmed');
-            targetNode.removeClass('dimmed');
-          }
-        }
-      };
-    });
+    // Set up handlers and restore active state for popover genres
+    setupGenreTagHandlers(cy);
+
   } finally {
     hideLoading();
   }
@@ -1306,7 +1281,7 @@ document.addEventListener('DOMContentLoaded', () => {
           cy.elements().addClass('dimmed');
           neighborhood.removeClass('dimmed');
           cy.animate({
-            fit: { eles: neighborhood, padding: 60 }
+            fit: { eles: neighborhood, padding: getFitPadding() }
           }, { duration: 500, easing: 'ease-in-out-cubic' });
         }
         dropdown.style.display = 'none';
