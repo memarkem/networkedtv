@@ -86,19 +86,15 @@ body {
   right: 0;
   z-index: 10;
   font-size: 0.75em;
-  color: #374151;
-  background: #fff;
-  opacity: 0.5;
+  color: #f1f1f1;
+  background: #3b3b3b;
+  opacity: 1;
   border-top: none;
   display: flex;
   flex-direction: row;
   align-items: center;
+  padding: 2px;
   flex-wrap: wrap;
-  padding: 0.4em 2vw 0.4em 2vw;
-  height: 2vh;
-  min-height: 0;
-  max-height: 2vh;
-  flex: 0 0 2vh;
   pointer-events: none; /* allow clicks to pass through if needed */
 }
 
@@ -113,16 +109,31 @@ body {
 
 .header-nav-item:hover {
   opacity: 1;
-  color: #6C3FC5;
+  color: #2EC4B6;
   font-weight: 500;
 }
 
+.header-nav-ellipsis {
+  margin-left:1svw;
+  font-size:1.2em;
+  letter-spacing:0.2em;
+  opacity:0.7;
+}
+
 .header-nav-arrow {
-  color: #888;
-  font-weight: bold;
-  font-size: 1.1em;
-  transform: rotate(0deg);
-  margin: 0 0.2em;
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0.18em;
+  vertical-align: middle;
+}
+
+.header-nav-arrow svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.header-nav-arrow:first-child {
+  margin-left: 1svw; /* or whatever indent you want */
 }
 
 /* Graph area */
@@ -593,9 +604,8 @@ body {
   /* Remove button-specific styles */
   appearance: none;
 }
-#site-title:hover,
-#site-title:focus {
-  background: #f3f0ff;
+#site-title:hover {
+  background: #e0e7ef;
 }
 .site-title-dropdown {
   position: absolute;

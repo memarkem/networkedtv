@@ -861,10 +861,18 @@ function renderNavigationTrail() {
   const navDiv = document.getElementById('header-nav-trail');
   if (!navDiv) return;
   let html = '';
-  navigationTrail.forEach((item, idx) => {
-    html += `<span class="header-nav-arrow">→</span>`;
-    html += `<span class="header-nav-item" data-idx="${idx}" data-id="${item.id}">${item.name}</span>`;
-  });
+  if (navigationTrail.length === 0) {
+    html = `<span class="header-nav-ellipsis">...</span>`;
+  } else {
+    navigationTrail.forEach((item, idx) => {
+      html += `<span class="header-nav-arrow" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 18 18">
+          <polyline points="6,4 12,9 6,14" fill="none" stroke="#bbb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>`;
+      html += `<span class="header-nav-item" data-idx="${idx}" data-id="${item.id}">${item.name}</span>`;
+    });
+  }
   navDiv.innerHTML = html;
 
   // Click handler for each nav item
@@ -875,9 +883,8 @@ function renderNavigationTrail() {
       try {
         const { show, writers, creatorIds } = await fetchShowById(showId);
         const idx = parseInt(this.getAttribute('data-idx'), 10);
-        // Remove the clicked item and all newer (to the left), keep only older (to the right)
         navigationTrail = navigationTrail.slice(idx + 1);
-        setOriginShow(show, false); // Do NOT reset trail
+        setOriginShow(show, false);
         await renderGraph(show, writers, creatorIds);
       } finally {
         hideLoading();
