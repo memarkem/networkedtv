@@ -1091,42 +1091,65 @@ async function showShowPopover(showId, node, cy) {
       popover.style.transform = '';
     }
 
-    // Add click handler for popover genre tags
+        // Add click handler for popover genre tags
     document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
       tag.onclick = function() {
         const genre = this.getAttribute('data-genre');
+        const wasActive = this.classList.contains('genre-tag-active');
+    
         // Remove active state from all tags (both title bar and popover)
         document.querySelectorAll('.genre-tag-clickable').forEach(other => {
           other.classList.remove('genre-tag-active');
         });
+    
         // Remove genre highlight from all nodes
         cy.nodes().removeClass('node-genre-highlight');
-
-        // Activate this tag
-        this.classList.add('genre-tag-active');
-
-        // Highlight all show nodes with this genre
-        const matchingNodes = cy.nodes('[type="show"]').filter(node =>
-          (node.data('genres') || []).includes(genre)
-        );
-        matchingNodes.addClass('node-genre-highlight');
-
-        // Dim non-matching nodes
-        cy.nodes('[type="show"]').forEach(node => {
-          if ((node.data('genres') || []).includes(genre)) {
-            node.removeClass('dimmed');
-          } else {
-            node.addClass('dimmed');
+    
+        if (!wasActive) {
+          // Activate this tag
+          this.classList.add('genre-tag-active');
+    
+          // Highlight all show nodes with this genre
+          const matchingNodes = cy.nodes('[type="show"]').filter(node =>
+            (node.data('genres') || []).includes(genre)
+          );
+          matchingNodes.addClass('node-genre-highlight');
+    
+          // Dim non-matching nodes
+          cy.nodes('[type="show"]').forEach(node => {
+            if ((node.data('genres') || []).includes(genre)) {
+              node.removeClass('dimmed');
+            } else {
+              node.addClass('dimmed');
+            }
+          });
+          cy.edges().addClass('dimmed');
+          matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
+    
+          // Zoom and fit to the matching nodes' neighbourhood
+          if (matchingNodes.length > 0) {
+            cy.animate({
+              fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
+            }, { duration: 500, easing: 'ease-in-out-cubic' });
           }
-        });
-        cy.edges().addClass('dimmed');
-        matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
-
-        // Zoom and fit to the matching nodes' neighbourhood
-        if (matchingNodes.length > 0) {
-          cy.animate({
-            fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
-          }, { duration: 500, easing: 'ease-in-out-cubic' });
+        } else {
+          // All tags are now inactive, so show only the last active node's neighborhood, or origin show if none
+          cy.nodes().removeClass('node-genre-highlight');
+          cy.elements().addClass('dimmed');
+          let targetNode = null;
+          if (window.lastActiveNodeId) {
+            targetNode = cy.getElementById(window.lastActiveNodeId);
+          }
+          if (!targetNode || !targetNode.length) {
+            // Fallback to origin show
+            targetNode = cy.nodes('.origin-show');
+          }
+          if (targetNode && targetNode.length) {
+            // Undim the node itself and its closed neighborhood (nodes + edges)
+            const neighborhood = targetNode.closedNeighborhood();
+            neighborhood.removeClass('dimmed');
+            targetNode.removeClass('dimmed');
+          }
         }
       };
     });
