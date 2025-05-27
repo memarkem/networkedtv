@@ -1183,26 +1183,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   const siteTitle = document.getElementById('site-title');
-  if (siteTitle) {
-    siteTitle.style.cursor = 'pointer';
-    siteTitle.title = 'Reset to The Wire';
-    siteTitle.addEventListener('click', async () => {
-      showLoading();
-      try {
-        const { show, writers, creatorIds } = await fetchWritersForShow('The Wire');
-        if (window.cy && typeof window.cy.destroy === 'function') {
-          window.cy.destroy();
-        }
-        await renderGraph(show, writers, creatorIds);
-        setOriginShow(show, true);
-      } catch (e) {
-        alert('Error resetting to The Wire.');
-        console.error(e);
-      } finally {
-        hideLoading();
-      }
-    });
+  let dropdown = document.getElementById('site-title-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.id = 'site-title-dropdown';
+    dropdown.className = 'site-title-dropdown';
+    dropdown.style.display = 'none';
+    siteTitle.parentNode.appendChild(dropdown);
   }
+
+  siteTitle.onclick = function(e) {
+    e.stopPropagation();
+    if (dropdown.classList.contains('open')) {
+      dropdown.classList.remove('open');
+      setTimeout(() => { dropdown.style.display = 'none'; }, 350);
+      return;
+    }
+    // --- Find most connected shows ---
+    const cy = window.cy;
+    if (!cy) return;
+    // Map: showId -> Set of ungrouped writer node ids
+    const showWriterMap = {};
+    cy.nodes('node[type="show"]').forEach(showNode => {
+      const showId = showNode.id();
+      showWriterMap[showId] = new Set();
+    });
+    cy.nodes('node[type="writer"]:not(.creator)').forEach(writerNode => {
+      writerNode.connectedEdges().forEach(edge => {
+        const other = edge.connectedNodes().filter(n => n.data('type') === 'show')[0];
+        if (other) showWriterMap[other.id()].add(writerNode.id());
+      });
+    });
+    // Build list of shows with at least 2 ungrouped writers
+    const originShowId = cy.nodes('.origin-show').id();
+    const showList = Object.entries(showWriterMap)
+      .map(([showId, writers]) => ({
+        showId,
+        writers: Array.from(writers),
+        count: writers.size,
+        label: cy.getElementById(showId).data('label')
+      }))
+      .filter(item => item.count >= 2 && item.showId !== originShowId) // Exclude origin
+      .sort((a, b) => b.count - a.count);
+
+    if (showList.length === 0) {
+      dropdown.innerHTML = '<div class="dropdown-item" style="color:#888;">No shows with ≥2 writers</div>';
+    } else {
+      dropdown.innerHTML = showList.map(item =>
+        `<div class="dropdown-item" data-show="${item.showId}">
+          ${item.label} <span style="color:#2EC4B6;">(${item.count} writer${item.count > 1 ? 's' : ''})</span>
+        </div>`
+      ).join('');
+    }
+    dropdown.style.display = 'block';
+    setTimeout(() => dropdown.classList.add('open'), 10); // trigger animation
+
+    // Click handler for dropdown items
+    dropdown.querySelectorAll('.dropdown-item[data-show]').forEach(item => {
+      item.onclick = function(ev) {
+        ev.stopPropagation();
+        const showId = this.getAttribute('data-show');
+        const node = cy.getElementById(showId);
+        if (node && node.nonempty()) {
+          const neighborhood = node.closedNeighborhood();
+          cy.elements().addClass('dimmed');
+          neighborhood.removeClass('dimmed');
+          cy.animate({
+            fit: { eles: neighborhood, padding: 60 }
+          }, { duration: 500, easing: 'ease-in-out-cubic' });
+        }
+        dropdown.style.display = 'none';
+      };
+    });
+  };
+
+  // Hide dropdown when clicking elsewhere
+  document.addEventListener('click', () => {
+    if (dropdown.classList.contains('open')) {
+      dropdown.classList.remove('open');
+      setTimeout(() => { dropdown.style.display = 'none'; }, 350);
+    }
+  });
 });
 
 function showPopover(popover, x, y) {

@@ -575,7 +575,69 @@ body {
   opacity: 1;
   text-decoration: none;
 }
-
+#site-title {
+  font-weight: 600;
+  font-size: clamp(1em, 2vmin, 1.2em);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.1em;
+  margin-left: 2em;
+  white-space: nowrap;
+  padding: 0.4em 1.2em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s;
+  outline: none;
+  user-select: none;
+  /* Remove button-specific styles */
+  appearance: none;
+}
+#site-title:hover,
+#site-title:focus {
+  background: #f3f0ff;
+}
+.site-title-dropdown {
+  position: absolute;
+  right: 1px; /* Offset from right edge */
+  left: auto;
+  top: 100%;
+  background: #fff;
+  border: 1px solid #e0e7ef;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px #0002;
+  z-index: 2000;
+  min-width: 220px;
+  max-width: 90vw; /* Prevent overflow */
+  width: max-content;
+  padding: 0.5em 0;
+  font-size: 1em;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(.4,0,.2,1), opacity 0.25s;
+  pointer-events: none;
+  text-align: left;
+}
+.site-title-dropdown.open {
+  max-height: 500px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.site-title-dropdown .dropdown-item {
+  display: block;
+  white-space: normal;
+  padding: 0.5em 1.2em;
+  cursor: pointer;
+  transition: background 0.15s;
+  color: #22223b;
+  border: none;
+  background: none;
+  word-break: break-word;
+}
+.site-title-dropdown .dropdown-item:hover {
+  background: #e0e7ef;
+}
 @media (max-width: 700px) {
   #title-bar {
     position: sticky;
@@ -604,7 +666,7 @@ body {
     margin: 0;
     padding: 1em 1em 1em 1em;
   }
-    .genre-tag-clickable:hover,
+  .genre-tag-clickable:hover,
   .genre-tag-clickable:active {
     background: #e0e7ef !important;
     color: #333 !important;
@@ -612,5 +674,9 @@ body {
   .genre-tag-clickable.genre-tag-active {
     background: #ffe066 !important;
     color: #22223b !important;
+  }
+  #legend-btn {
+    bottom: calc(1.5em + 48px); /* Adjust 2.5em for search bar, 48px for footer, tweak as needed */
+    right: 12px;
   }
 }
