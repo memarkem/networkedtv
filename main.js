@@ -934,7 +934,7 @@ function setupShowNodePopover(cy) {
     node.addClass('cy-node-pressing');
     showShowPopover(showId, node, cy);
     justOpenedPopover = true;
-    setTimeout(() => { justOpenedPopover = false; }, 350); // Ignore touchend/tap for 350ms
+    setTimeout(() => { justOpenedPopover = false; }, 350);
   }
 
   function clearPopoverTimer() {
@@ -956,7 +956,7 @@ function setupShowNodePopover(cy) {
 
   // Desktop: highlight immediately, popover after 600ms
   cy.on('mouseover', 'node[type="show"]', evt => {
-    if ('ontouchstart' in window) return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
     const node = evt.target;
     node.addClass('cy-node-pressing');
     hoverTimer = setTimeout(() => openPopover(node.data('id').replace('show_', ''), node), 600);
@@ -965,12 +965,12 @@ function setupShowNodePopover(cy) {
 
   // Mobile: long press (600ms)
   cy.on('touchstart', 'node[type="show"]', evt => {
-    if (!('ontouchstart' in window)) return;
+    if (!window.matchMedia('(pointer: coarse)').matches) return;
     const node = evt.target;
     longPressFired = false;
     node._pressingTimeout = setTimeout(() => {
       node.addClass('cy-node-pressing');
-    }, 400);
+    }, 100);
     node._popoverTimeout = setTimeout(() => {
       openPopover(node.data('id').replace('show_', ''), node);
       longPressFired = true;
@@ -981,22 +981,32 @@ function setupShowNodePopover(cy) {
     const node = evt.target;
     if (node._pressingTimeout) clearTimeout(node._pressingTimeout);
     if (node._popoverTimeout) clearTimeout(node._popoverTimeout);
-    // Only close if popover was actually opened by long press, and not immediately after opening
-    if (longPressFired && !justOpenedPopover) clearPopoverTimer();
-    else cy.nodes('.cy-node-pressing').removeClass('cy-node-pressing');
+    // Do NOT close the popover here!
+    // Only remove color if long press didn't finish
+    if (!longPressFired) {
+      node.removeClass('cy-node-pressing');
+    }
     longPressFired = false;
   });
 
-  // Only close popover on desktop tap
-  cy.on('tap', evt => {
-    if (!('ontouchstart' in window)) {
-      if (evt.target === cy || evt.target.isNode()) {
-        clearPopoverTimer();
+  // Only close popover when tapping/clicking outside
+  ['touchstart', 'mousedown'].forEach(eventType => {
+    document.addEventListener(eventType, function(e) {
+      const popover = document.getElementById('show-popover');
+      if (
+        popover &&
+        popover.style.display === 'block' &&
+        !popover.contains(e.target)
+      ) {
+        popover.classList.remove('popover-visible');
+        setTimeout(() => { popover.style.display = 'none'; }, 220);
+        cy.nodes('.cy-node-pressing').removeClass('cy-node-pressing');
+        lastShowId = null;
       }
-    }
+    });
   });
 
-  // Close button
+  // Close button (if you have one)
   const closeBtn = document.getElementById('popover-close');
   if (closeBtn) {
     closeBtn.onclick = clearPopoverTimer;
@@ -1183,14 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   const siteTitle = document.getElementById('site-title');
-  let dropdown = document.getElementById('site-title-dropdown');
-  if (!dropdown) {
-    dropdown = document.createElement('div');
-    dropdown.id = 'site-title-dropdown';
-    dropdown.className = 'site-title-dropdown';
-    dropdown.style.display = 'none';
-    siteTitle.parentNode.appendChild(dropdown);
-  }
+  const dropdown = document.getElementById('site-title-dropdown');
 
   siteTitle.onclick = function(e) {
     e.stopPropagation();
@@ -1257,12 +1260,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  // Hide dropdown when clicking elsewhere
-  document.addEventListener('click', () => {
-    if (dropdown.classList.contains('open')) {
-      dropdown.classList.remove('open');
-      setTimeout(() => { dropdown.style.display = 'none'; }, 350);
-    }
+  // Hide dropdown when clicking or tapping elsewhere
+  ['click', 'touchstart'].forEach(eventType => {
+    document.addEventListener(eventType, (e) => {
+      if (
+        dropdown.classList.contains('open') &&
+        !dropdown.contains(e.target) &&
+        e.target !== siteTitle
+      ) {
+        dropdown.classList.remove('open');
+        setTimeout(() => { dropdown.style.display = 'none'; }, 350);
+      }
+    });
   });
 });
 
@@ -1388,7 +1397,7 @@ function updateOriginHeader(show, writers, writerIdxToNodeId) {
 document.addEventListener('DOMContentLoaded', () => {
   const legendBtn = document.getElementById('legend-btn');
   const legendModal = document.getElementById('legend-modal');
-  const legendClose = document.getElementById('legend-close');
+  const legendClose = document.getElementById('legend_close');
   if (legendBtn && legendModal && legendClose) {
     legendBtn.onclick = () => legendModal.classList.add('active');
     legendClose.onclick = () => legendModal.classList.remove('active');
