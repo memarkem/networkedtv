@@ -585,7 +585,7 @@ async function renderGraph(show, writers, creatorIds) {
       const genre = this.getAttribute('data-genre');
       const wasActive = this.classList.contains('genre-tag-active');
 
-      // Remove active state from all tags
+      // Remove active state from all tags (both title bar and popover)
       document.querySelectorAll('.genre-tag-clickable').forEach(other => {
         other.classList.remove('genre-tag-active');
       });
@@ -594,8 +594,14 @@ async function renderGraph(show, writers, creatorIds) {
       cy.nodes().removeClass('node-genre-highlight');
 
       if (!wasActive) {
-        // Activate this tag
+        // Activate this tag in popover
         this.classList.add('genre-tag-active');
+        // Also activate in title bar if present
+        document.querySelectorAll('#origin-series .genre-tag-clickable').forEach(tag2 => {
+          if (tag2.getAttribute('data-genre') === genre) {
+            tag2.classList.add('genre-tag-active');
+          }
+        });
 
         // Highlight all show nodes with this genre
         const matchingNodes = cy.nodes('[type="show"]').filter(node =>
@@ -625,8 +631,8 @@ async function renderGraph(show, writers, creatorIds) {
         cy.nodes().removeClass('node-genre-highlight');
         cy.elements().addClass('dimmed');
         let targetNode = null;
-        if (lastActiveNodeId) {
-          targetNode = cy.getElementById(lastActiveNodeId);
+        if (window.lastActiveNodeId) {
+          targetNode = cy.getElementById(window.lastActiveNodeId);
         }
         if (!targetNode || !targetNode.length) {
           // Fallback to origin show
@@ -1098,8 +1104,18 @@ async function showShowPopover(showId, node, cy) {
       popover.style.transform = '';
     }
 
+        // After setting #popover-genres.innerHTML = genresHtml;
+    const activeGenre = document.querySelector('.genre-tag-clickable.genre-tag-active');
+    if (activeGenre) {
+      const activeGenreName = activeGenre.getAttribute('data-genre');
+      document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
+        if (tag.getAttribute('data-genre') === activeGenreName) {
+          tag.classList.add('genre-tag-active');
+        }
+      });
+    }
         // Add click handler for popover genre tags
-    document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
+        document.querySelectorAll('#popover-genres .genre-tag-clickable').forEach(tag => {
       tag.onclick = function() {
         const genre = this.getAttribute('data-genre');
         const wasActive = this.classList.contains('genre-tag-active');
@@ -1113,8 +1129,14 @@ async function showShowPopover(showId, node, cy) {
         cy.nodes().removeClass('node-genre-highlight');
     
         if (!wasActive) {
-          // Activate this tag
+          // Activate this tag in popover
           this.classList.add('genre-tag-active');
+          // Also activate in title bar if present
+          document.querySelectorAll('#origin-series .genre-tag-clickable').forEach(tag2 => {
+            if (tag2.getAttribute('data-genre') === genre) {
+              tag2.classList.add('genre-tag-active');
+            }
+          });
     
           // Highlight all show nodes with this genre
           const matchingNodes = cy.nodes('[type="show"]').filter(node =>
