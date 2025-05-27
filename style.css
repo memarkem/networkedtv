@@ -504,22 +504,26 @@ body {
   list-style: none;
   padding-left: 0;
   margin-top: 1em;
-}
-.legend-nodes li {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(70px, 1fr) 1.8fr;
+  gap: 0.2em 1em;
   align-items: center;
-  margin-bottom: 0.7em;
-  font-size: 1em;
+}
+
+.legend-nodes li {
+  display: contents; /* Use grid children directly */
 }
 .legend-swatch {
+  grid-column: 1;
+  justify-self: end;
+  margin-right: 0.2em;
   display: inline-block;
-  width: 1.4em;
-  height: 1.4em;
+  width: 1.2em;
+  height: 1.2em;
   border-radius: 50%;
-  margin-right: 0.7em;
-  aspect-ratio: 1/1;
-  border: 2px solid #e0e7ef;
+  border: 3px solid transparent;
   box-sizing: border-box;
+  vertical-align: middle;
 }
 .legend-desc {
   margin-left: 0.5em;
@@ -544,12 +548,12 @@ body {
 }
 .origin-swatch {
   background: #6C3FC5;
-  border: 3px solid #2EC4B6;
+  border: 1px solid #2EC4B6;
   box-shadow: 0 0 0 2px #2EC4B6;
 }
 .creator-swatch {
   background: #2EC4B6;
-  border: 3px solid #6C3FC5;
+  border: 1px solid #6C3FC5;
   box-shadow: 0 0 0 2px #6C3FC5;
 }
 .genre-swatch {
