@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NetworkedTV</title>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://unpkg.com/cytoscape@3.23.0/dist/cytoscape.min.js"></script>
+</head>
+<body>
+  <header id="title-bar">
+      <div id="origin-series"></div>
+      <div id="site-title">NetworkedTV</div>
+    </div>
+  </header>
+  <div id="main-content">
+    <div id="header-nav-trail"></div>
+    <div id="cy"></div>
+  </div>
+  <div id="loading-overlay">
+    <span id="loading-dots">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </span>
+  </div>
+  <div id="bottom-bar-container">
+    <div id="bottom-search-bar">
+      <div id="search-container">
+        <form id="search-form">
+          <input id="search-input" type="text" value="The Wire" />
+          <button type="submit">Search</button>
+        </form>
+        <div id="search-results"></div>
+      </div>
+    </div>
+    <footer id="footer-bar">
+      <div>
+        Data sourced from
+        <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDb</a>.
+        Writer credits reflect publicly listed crew and may be incomplete.
+        This tool is for informational and visualization purposes only.
+      </div>
+    </footer>
+  </div>
+  <div id="show-popover" class="show-popover" style="display:none;">
+    <h3 id="popover-title"></h3>
+    <div id="popover-genres"></div>
+    <div id="popover-overview"></div>
+  </div>
+  <button id="legend-btn" title="Show legend">?</button>
+<div id="legend-modal" class="legend-modal">
+  <div class="legend-content">
+    <button id="legend-close" title="Close legend">&times;</button>
+    <ul class="legend-nodes">
+      <li>
+        <span class="legend-swatch show-swatch"></span>
+        <b>Show</b> <span class="legend-desc">(purple node)</span>
+      </li>
+      <li>
+        <span class="legend-swatch writer-swatch"></span>
+        <b>Writer</b> <span class="legend-desc">(teal node)</span>
+      </li>
+      <li>
+        <span class="legend-swatch origin-swatch"></span>
+        <b>Origin Show</b> <span class="legend-desc">(starting point)</span>
+      </li>
+      <li>
+        <span class="legend-swatch creator-swatch"></span>
+        <b>Creator</b> <span class="legend-desc">(writer(s) who created the show)</span>
+      </li>
+      <li>
+        <span class="legend-swatch genre-swatch"></span>
+        <b>Genre Highlight</b> <span class="legend-desc">(show matches selected genre)</span>
+      </li>
+    </ul>
+    <div class="legend-actions">
+      <div><b>Tap</b>: Focus on a node and its connections.</div>
+      <div><b>Hold</b>: Show details about a node.</div>
+      <div><b>Double-tap show</b>: Generate a new network from that show.</div>
+      <div><b>Tap background</b>: Reset view to show all.</div>
+      <div><b>Tap a genre tag</b>: Highlight all shows with that genre.</div>
+      <div><b>Use the search bar</b>: Have fun. Discover new shows.</div>
+    </div>
+  </div>
+</div>
+  <script src="main.js"></script>
+</body>
+</html>
