@@ -1234,11 +1234,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const showId = showNode.id();
       showWriterMap[showId] = new Set();
     });
-    cy.nodes('node[type="writer"]:not(.creator)').forEach(writerNode => {
-      writerNode.connectedEdges().forEach(edge => {
-        const other = edge.connectedNodes().filter(n => n.data('type') === 'show')[0];
-        if (other) showWriterMap[other.id()].add(writerNode.id());
-      });
+    cy.nodes('node[type="writer"]').forEach(writerNode => {
+      if (!writerNode.hasClass('creator')) {
+        writerNode.connectedEdges().forEach(edge => {
+          const other = edge.connectedNodes().filter(n => n.data('type') === 'show')[0];
+          if (other) showWriterMap[other.id()].add(writerNode.id());
+        });
+      }
     });
     // Build list of shows with at least 2 ungrouped writers
     const originShowId = cy.nodes('.origin-show').id();
@@ -1286,6 +1288,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hide dropdown when clicking or tapping elsewhere
   ['click', 'touchstart'].forEach(eventType => {
     document.addEventListener(eventType, (e) => {
+      // Ignore clicks on legend button or inside legend modal
+      if (
+        (e.target.closest && e.target.closest('#legend-btn')) ||
+        (e.target.closest && e.target.closest('#legend-modal'))
+      ) {
+        return;
+      }
+      // Only close the dropdown if open, and click is outside dropdown and siteTitle
       if (
         dropdown.classList.contains('open') &&
         !dropdown.contains(e.target) &&
@@ -1294,7 +1304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dropdown.classList.remove('open');
         setTimeout(() => { dropdown.style.display = 'none'; }, 350);
       }
-    });
+    }, { passive: false });
   });
 });
 
@@ -1420,7 +1430,7 @@ function updateOriginHeader(show, writers, writerIdxToNodeId) {
 document.addEventListener('DOMContentLoaded', () => {
   const legendBtn = document.getElementById('legend-btn');
   const legendModal = document.getElementById('legend-modal');
-  const legendClose = document.getElementById('legend_close');
+  const legendClose = document.getElementById('legend-close');
   if (legendBtn && legendModal && legendClose) {
     legendBtn.onclick = () => legendModal.classList.add('active');
     legendClose.onclick = () => legendModal.classList.remove('active');
