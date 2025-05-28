@@ -21,6 +21,7 @@ const TMDB_GENRES = {
 };
 
 window.activeGenreName = null;
+window.lastActiveNodeId = null;
 
 // Centralized genre tag handler
 function setupGenreTagHandlers(cy) {
@@ -82,6 +83,9 @@ function setupGenreTagHandlers(cy) {
           const neighborhood = targetNode.closedNeighborhood();
           neighborhood.removeClass('dimmed');
           targetNode.removeClass('dimmed');
+          cy.animate({
+            fit: { eles: neighborhood, padding: getFitPadding() }
+          }, { duration: 500, easing: 'ease-in-out-cubic' });
         }
       }
     };
@@ -549,8 +553,7 @@ async function renderGraph(show, writers, creatorIds) {
   });
 
   cy.on('tap', 'node', evt => {
-    lastActiveNodeId = evt.target.id();
-
+    window.lastActiveNodeId = evt.target.id(); // <-- Track globally
     const node = evt.target;
     const neighborhood = node.closedNeighborhood();
 
