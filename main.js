@@ -161,6 +161,8 @@ async function fetchSeriesForWriter(writerId) {
 }
 
 async function renderGraph(show, writers, creatorIds) {
+  showLoading(); // Show the loading overlay
+
   // Always destroy previous instance to avoid duplicate handlers
   if (window.cy && typeof window.cy.destroy === 'function') {
     window.cy.destroy();
@@ -188,18 +190,6 @@ async function renderGraph(show, writers, creatorIds) {
   }];
   const edges = [];
   const seriesSet = new Set([show.id]);
-
-  // REMOVE THIS BLOCK:
-  //// writers.forEach((w, i) => {
-  ////   nodes.push({
-  ////     data: { id: `writer_${i}`, label: w.name, type: 'writer', tmdbId: w.id },
-  ////     classes: w.isCreator ? 'creator' : ''
-  ////   });
-  ////   edges.push({
-  ////     data: { source: `show_${show.id}`, target: `writer_${i}` },
-  ////     classes: w.isCreator ? 'origin-creator' : ''
-  ////   });
-  //// });
 
   for (let i = 0; i < writers.length; i++) {
     const w = writers[i];
@@ -417,7 +407,7 @@ async function renderGraph(show, writers, creatorIds) {
   cy.userZoomingEnabled(true);
 
   cy.ready(() => {
-    // Find the most connected show and writer nodes
+    // --- Node sizing and label fitting ---
     let maxShowDegree = 0, maxWriterDegree = 0;
     let showNodes = [], writerNodes = [];
     cy.nodes().forEach(node => {
@@ -518,39 +508,95 @@ async function renderGraph(show, writers, creatorIds) {
       });
     });
 
-    const originNode = cy.nodes('[id = "show_' + show.id + '"]');
-    if (originNode.nonempty()) {
-      cy.resize();
-      if (!window.activeGenreName) {
-        cy.animate({
-          fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
-        }, { duration: 500, easing: 'ease-in-out-cubic' });
-
+        // --- Initial fit and cinematic zoom ---
+    cy.fit(undefined, getFitPadding());
+      
+    // --- Highlight origin show neighborhood if no genre is active ---
+    if (!window.activeGenreName) {
+      const originNode = cy.nodes('.origin-show');
+      if (originNode.nonempty()) {
         const neighborhood = originNode.closedNeighborhood();
         cy.elements().addClass('dimmed');
         neighborhood.removeClass('dimmed');
-
-        setTimeout(() => {
-          if (!isOriginNodeCentered(cy, originNode)) {
-            cy.resize();
-            cy.animate({
-              fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
-            }, { duration: 400, easing: 'ease-in-out-cubic' });
-          }
-        }, 600);
-      } else {
-        // If a genre is active, after genre fit, check if origin node is centered
-        setTimeout(() => {
-          if (!isOriginNodeCentered(cy, originNode)) {
-            cy.resize();
-            cy.animate({
-              fit: { eles: originNode.closedNeighborhood(), padding: getFitPadding() }
-            }, { duration: 400, easing: 'ease-in-out-cubic' });
-          }
-        }, 600);
       }
     }
+
+    cy.once('layoutstop', () => {
+      hideLoading();
+    
+      setTimeout(() => {
+        // If a genre is active, zoom to those nodes
+        if (window.activeGenreName) {
+          const matchingNodes = cy.nodes('[type="show"]').filter(node =>
+            (node.data('genres') || []).includes(window.activeGenreName)
+          );
+          if (matchingNodes.length > 0) {
+            // Apply highlight/dim logic here as well!
+            matchingNodes.addClass('node-genre-highlight');
+            cy.nodes('[type="show"]').forEach(node => {
+              if ((node.data('genres') || []).includes(window.activeGenreName)) {
+                node.removeClass('dimmed');
+              } else {
+                node.addClass('dimmed');
+              }
+            });
+            cy.edges().addClass('dimmed');
+            matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
+    
+            cy.animate({
+              fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
+            }, { duration: 600, easing: 'ease-in-out-cubic' });
+            return;
+          }
+        }
+        // Otherwise, zoom to last active node or origin
+        let targetNode = null;
+        if (window.lastActiveNodeId) {
+          targetNode = cy.getElementById(window.lastActiveNodeId);
+        }
+        if (!targetNode || !targetNode.length) {
+          targetNode = cy.nodes('.origin-show');
+        }
+        if (targetNode && targetNode.length) {
+          cy.animate({
+            fit: { eles: targetNode.closedNeighborhood(), padding: getFitPadding() }
+          }, { duration: 600, easing: 'ease-in-out-cubic' });
+        }
+      }, 100); // Small delay for overlay fade
+    });
+
+    // If not using a layout, just hide the overlay and animate as above
+    if (!cy.layout) {
+      hideLoading();
+      setTimeout(() => {
+        if (window.activeGenreName) {
+          const matchingNodes = cy.nodes('[type="show"]').filter(node =>
+            (node.data('genres') || []).includes(window.activeGenreName)
+          );
+          if (matchingNodes.length > 0) {
+            cy.animate({
+              fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
+            }, { duration: 600, easing: 'ease-in-out-cubic' });
+            return;
+          }
+        }
+        let targetNode = null;
+        if (window.lastActiveNodeId) {
+          targetNode = cy.getElementById(window.lastActiveNodeId);
+        }
+        if (!targetNode || !targetNode.length) {
+          targetNode = cy.nodes('.origin-show');
+        }
+        if (targetNode && targetNode.length) {
+          cy.animate({
+            fit: { eles: targetNode.closedNeighborhood(), padding: getFitPadding() }
+          }, { duration: 600, easing: 'ease-in-out-cubic' });
+        }
+      }, 100);
+    }
   });
+
+  cy.userZoomingEnabled(true);
 
   cy.on('tap', 'node', evt => {
     window.lastActiveNodeId = evt.target.id(); // <-- Track globally
@@ -670,38 +716,6 @@ async function renderGraph(show, writers, creatorIds) {
 
   // Set up handlers and restore active state
   setupGenreTagHandlers(cy);
-
-  // --- Apply genre highlight if a genre is active ---
-  if (window.activeGenreName) {
-    // Activate all tags with this genre
-    document.querySelectorAll(`.genre-tag-clickable[data-genre="${window.activeGenreName}"]`).forEach(tag => {
-      tag.classList.add('genre-tag-active');
-    });
-
-    // Highlight all show nodes with this genre
-    const matchingNodes = cy.nodes('[type="show"]').filter(node =>
-      (node.data('genres') || []).includes(window.activeGenreName)
-    );
-    matchingNodes.addClass('node-genre-highlight');
-
-    // Dim non-matching nodes
-    cy.nodes('[type="show"]').forEach(node => {
-      if ((node.data('genres') || []).includes(window.activeGenreName)) {
-        node.removeClass('dimmed');
-      } else {
-        node.addClass('dimmed');
-      }
-    });
-    cy.edges().addClass('dimmed');
-    matchingNodes.forEach(node => node.connectedEdges().removeClass('dimmed'));
-
-    // Zoom and fit to the matching nodes' neighbourhood
-    if (matchingNodes.length > 0) {
-      cy.animate({
-        fit: { eles: matchingNodes.neighborhood().add(matchingNodes), padding: getFitPadding() }
-      }, { duration: 500, easing: 'ease-in-out-cubic' });
-    }
-  }
 }
 
 function updateOriginHeader(show, writers, writerIdxToNodeId) {
