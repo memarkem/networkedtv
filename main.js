@@ -184,7 +184,8 @@ async function renderGraph(show, writers, creatorIds) {
       id: `show_${show.id}`,
       label: show.name + (show.first_air_date ? ` (${show.first_air_date.slice(0, 4)})` : ''),
       type: 'show',
-      genres: originGenres
+      genres: originGenres,
+      creatorIds // <-- add this!
     },
     classes: 'origin-show'
   }];
@@ -199,12 +200,27 @@ async function renderGraph(show, writers, creatorIds) {
         const genres = (series.genre_ids || series.genres || [])
           .map(g => typeof g === 'number' ? TMDB_GENRES[g] : (g.name || TMDB_GENRES[g.id]))
           .filter(Boolean);
+
+        // --- Fetch creator IDs for this series ---
+        let seriesCreatorIds = [];
+        try {
+          const seriesDetailsRes = await fetch(
+            `https://api.themoviedb.org/3/tv/${series.id}?api_key=${apiKey}`
+          );
+          const seriesDetails = await seriesDetailsRes.json();
+          seriesCreatorIds = (seriesDetails.created_by || []).map(c => c.id);
+        } catch (e) {
+          // If fetch fails, leave creatorIds empty
+          seriesCreatorIds = [];
+        }
+
         nodes.push({
           data: {
             id: `show_${series.id}`,
             label: series.name + (series.first_air_date ? ` (${series.first_air_date.slice(0, 4)})` : ''),
             type: 'show',
-            genres
+            genres,
+            creatorIds: seriesCreatorIds
           }
         });
         seriesSet.add(series.id);
@@ -319,6 +335,13 @@ async function renderGraph(show, writers, creatorIds) {
           'width': 140,
           'height': 140,
           'font-size': '16px'
+        }
+      },
+      {
+        selector: 'node[type="show"].creator',
+        style: {
+          'border-color': '#2EC4B6',
+          'border-width': 4,
         }
       },
       {
@@ -599,12 +622,51 @@ async function renderGraph(show, writers, creatorIds) {
   cy.userZoomingEnabled(true);
 
   cy.on('tap', 'node', evt => {
-    window.lastActiveNodeId = evt.target.id(); // <-- Track globally
+    window.lastActiveNodeId = evt.target.id();
     const node = evt.target;
     const neighborhood = node.closedNeighborhood();
 
+    cy.nodes().removeClass('creator');
+    cy.nodes().removeClass('origin-show');
     cy.elements().addClass('dimmed');
     neighborhood.removeClass('dimmed');
+
+    if (node.data('type') === 'show') {
+      node.addClass('origin-show');
+      const creatorIds = node.data('creatorIds') || [];
+      neighborhood.nodes('[type="writer"]').forEach(writerNode => {
+        if (writerNode.data('tmdbIds')) {
+          if ((writerNode.data('tmdbIds') || []).some(id => creatorIds.includes(id))) {
+            writerNode.addClass('creator');
+          }
+        } else {
+          if (creatorIds.includes(writerNode.data('tmdbId'))) {
+            writerNode.addClass('creator');
+          }
+        }
+      });
+    } else if (node.data('type') === 'writer') {
+      node.addClass('focused-writer');
+      let isCreator = false;
+      neighborhood.nodes('[type="show"]').forEach(showNode => {
+        const creatorIds = showNode.data('creatorIds') || [];
+        if (node.data('tmdbIds')) {
+          if ((node.data('tmdbIds') || []).some(id => creatorIds.includes(id))) {
+            showNode.addClass('creator');
+            isCreator = true;
+          }
+        } else {
+          if (creatorIds.includes(node.data('tmdbId'))) {
+            showNode.addClass('creator');
+            isCreator = true;
+          }
+        }
+      });
+      // Also highlight the writer node itself if they are a creator for any show in the neighborhood
+      if (isCreator) {
+        node.addClass('creator');
+      }
+    }
 
     cy.animate({
       fit: { eles: neighborhood, padding: getFitPadding() }
@@ -828,6 +890,7 @@ function renderDropdown(results, searchResultsDiv) {
           </div>
         `;
       }).join('')}
+
     </div>
   `;
 
@@ -1451,7 +1514,7 @@ function updateOriginHeader(show, writers, writerIdxToNodeId) {
 document.addEventListener('DOMContentLoaded', () => {
   const legendBtn = document.getElementById('legend-btn');
   const legendModal = document.getElementById('legend-modal');
-  const legendClose = document.getElementById('legend-close');
+  const legendClose = document.getElementById('legend_close');
   if (legendBtn && legendModal && legendClose) {
     legendBtn.onclick = () => legendModal.classList.add('active');
     legendClose.onclick = () => legendModal.classList.remove('active');
