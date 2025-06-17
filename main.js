@@ -809,13 +809,7 @@ function enableHeaderNodeLinks(cy) {
       const nodeId = this.getAttribute('data-node');
       const node = cy.getElementById(nodeId);
       if (node && node.nonempty()) {
-        const neighborhood = node.closedNeighborhood();
-        cy.elements().addClass('dimmed');
-        neighborhood.removeClass('dimmed');
-        cy.resize();
-        cy.animate({
-          fit: { eles: neighborhood, padding: getFitPadding() }
-        }, { duration: 500, easing: 'ease-in-out-cubic' });
+        node.emit('tap');
       }
     };
   });
@@ -1357,12 +1351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const showId = this.getAttribute('data-show');
         const node = cy.getElementById(showId);
         if (node && node.nonempty()) {
-          const neighborhood = node.closedNeighborhood();
-          cy.elements().addClass('dimmed');
-          neighborhood.removeClass('dimmed');
-          cy.animate({
-            fit: { eles: neighborhood, padding: getFitPadding() }
-          }, { duration: 500, easing: 'ease-in-out-cubic' });
+          node.emit('tap');
         }
         dropdown.style.display = 'none';
       };
@@ -1514,12 +1503,47 @@ function updateOriginHeader(show, writers, writerIdxToNodeId) {
 document.addEventListener('DOMContentLoaded', () => {
   const legendBtn = document.getElementById('legend-btn');
   const legendModal = document.getElementById('legend-modal');
-  const legendClose = document.getElementById('legend_close');
+  const legendClose = document.getElementById('legend-close');
   if (legendBtn && legendModal && legendClose) {
-    legendBtn.onclick = () => legendModal.classList.add('active');
+    legendBtn.onclick = () => {
+      legendModal.classList.add('active');
+      trapFocus(legendModal);
+      // Focus the close button for accessibility
+      legendClose.focus();
+    };
     legendClose.onclick = () => legendModal.classList.remove('active');
     legendModal.onclick = (e) => {
       if (e.target === legendModal) legendModal.classList.remove('active');
     };
   }
 });
+
+function trapFocus(modal) {
+  const focusableSelectors = [
+    'a[href]', 'button:not([disabled])', 'textarea', 'input[type="text"]',
+    'input[type="radio"]', 'input[type="checkbox"]', 'select', '[tabindex]:not([tabindex="-1"])'
+  ];
+  const focusableEls = modal.querySelectorAll(focusableSelectors.join(','));
+  if (!focusableEls.length) return;
+  const firstEl = focusableEls[0];
+  const lastEl = focusableEls[focusableEls.length - 1];
+
+  modal.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      if (e.shiftKey) { // Shift + Tab
+        if (document.activeElement === firstEl) {
+          e.preventDefault();
+          lastEl.focus();
+        }
+      } else { // Tab
+        if (document.activeElement === lastEl) {
+          e.preventDefault();
+          firstEl.focus();
+        }
+      }
+    }
+    if (e.key === 'Escape') {
+      modal.classList.remove('active');
+    }
+  });
+}
