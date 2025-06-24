@@ -148,7 +148,10 @@ async function fetchShowById(showId) {
   return { show: showDetails, writers, creatorIds };
 }
 
+const showCreatorCache = {};
+
 const writerSeriesCache = {};
+
 async function fetchSeriesForWriter(writerId) {
   if (writerSeriesCache[writerId]) return writerSeriesCache[writerId];
   const resp = await fetch(
@@ -201,26 +204,14 @@ async function renderGraph(show, writers, creatorIds) {
           .map(g => typeof g === 'number' ? TMDB_GENRES[g] : (g.name || TMDB_GENRES[g.id]))
           .filter(Boolean);
 
-        // --- Fetch creator IDs for this series ---
-        let seriesCreatorIds = [];
-        try {
-          const seriesDetailsRes = await fetch(
-            `https://api.themoviedb.org/3/tv/${series.id}?api_key=${apiKey}`
-          );
-          const seriesDetails = await seriesDetailsRes.json();
-          seriesCreatorIds = (seriesDetails.created_by || []).map(c => c.id);
-        } catch (e) {
-          // If fetch fails, leave creatorIds empty
-          seriesCreatorIds = [];
-        }
-
+        // Do NOT include creatorIds here!
         nodes.push({
           data: {
             id: `show_${series.id}`,
             label: series.name + (series.first_air_date ? ` (${series.first_air_date.slice(0, 4)})` : ''),
             type: 'show',
-            genres,
-            creatorIds: seriesCreatorIds
+            genres
+            // creatorIds: seriesCreatorIds // <-- REMOVE THIS LINE
           }
         });
         seriesSet.add(series.id);
@@ -376,13 +367,6 @@ async function renderGraph(show, writers, creatorIds) {
         style: {
           'line-color': '#E0E7EF',
           'opacity': 0.8,
-        }
-      },
-      {
-        selector: 'edge.origin-creator',
-        style: {
-          'line-color': '#000000',
-          'opacity': 1
         }
       },
       {
@@ -621,19 +605,33 @@ async function renderGraph(show, writers, creatorIds) {
 
   cy.userZoomingEnabled(true);
 
-  cy.on('tap', 'node', evt => {
+  cy.on('tap', 'node', async evt => {
     window.lastActiveNodeId = evt.target.id();
     const node = evt.target;
     const neighborhood = node.closedNeighborhood();
-
+  
     cy.nodes().removeClass('creator');
     cy.nodes().removeClass('origin-show');
     cy.elements().addClass('dimmed');
     neighborhood.removeClass('dimmed');
-
+  
     if (node.data('type') === 'show') {
       node.addClass('origin-show');
-      const creatorIds = node.data('creatorIds') || [];
+      let creatorIds = node.data('creatorIds');
+      if (!creatorIds) {
+        // Check cache first
+        const showId = node.data('id').replace('show_', '');
+        if (showCreatorCache[showId]) {
+          creatorIds = showCreatorCache[showId];
+        } else {
+          // Fetch and cache
+          const res = await fetch(`https://api.themoviedb.org/3/tv/${showId}?api_key=${apiKey}`);
+          const details = await res.json();
+          creatorIds = (details.created_by || []).map(c => c.id);
+          showCreatorCache[showId] = creatorIds;
+          node.data('creatorIds', creatorIds);
+        }
+      }
       neighborhood.nodes('[type="writer"]').forEach(writerNode => {
         if (writerNode.data('tmdbIds')) {
           if ((writerNode.data('tmdbIds') || []).some(id => creatorIds.includes(id))) {
@@ -648,8 +646,21 @@ async function renderGraph(show, writers, creatorIds) {
     } else if (node.data('type') === 'writer') {
       node.addClass('focused-writer');
       let isCreator = false;
-      neighborhood.nodes('[type="show"]').forEach(showNode => {
-        const creatorIds = showNode.data('creatorIds') || [];
+      // For each show in the neighborhood, fetch creatorIds if needed
+      await Promise.all(neighborhood.nodes('[type="show"]').map(async showNode => {
+        let creatorIds = showNode.data('creatorIds');
+        if (!creatorIds) {
+          const showId = showNode.data('id').replace('show_', '');
+          if (showCreatorCache[showId]) {
+            creatorIds = showCreatorCache[showId];
+          } else {
+            const res = await fetch(`https://api.themoviedb.org/3/tv/${showId}?api_key=${apiKey}`);
+            const details = await res.json();
+            creatorIds = (details.created_by || []).map(c => c.id);
+            showCreatorCache[showId] = creatorIds;
+            showNode.data('creatorIds', creatorIds);
+          }
+        }
         if (node.data('tmdbIds')) {
           if ((node.data('tmdbIds') || []).some(id => creatorIds.includes(id))) {
             showNode.addClass('creator');
@@ -661,13 +672,12 @@ async function renderGraph(show, writers, creatorIds) {
             isCreator = true;
           }
         }
-      });
-      // Also highlight the writer node itself if they are a creator for any show in the neighborhood
+      }));
       if (isCreator) {
         node.addClass('creator');
       }
     }
-
+  
     cy.animate({
       fit: { eles: neighborhood, padding: getFitPadding() }
     }, { duration: 500, easing: 'ease-in-out-cubic' });
