@@ -1105,6 +1105,8 @@ function setupShowNodePopover(cy) {
   cy.on('mouseover', 'node[type="show"]', evt => {
     if (window.matchMedia('(pointer: coarse)').matches) return;
     const node = evt.target;
+    // Only allow popover for nodes not dimmed (i.e., in active neighborhood)
+    if (node.hasClass('dimmed')) return;
     node.addClass('cy-node-pressing');
     hoverTimer = setTimeout(() => openPopover(node.data('id').replace('show_', ''), node), 600);
   });
@@ -1114,6 +1116,7 @@ function setupShowNodePopover(cy) {
   cy.on('touchstart', 'node[type="show"]', evt => {
     if (!window.matchMedia('(pointer: coarse)').matches) return;
     const node = evt.target;
+    if (node.hasClass('dimmed')) return;
     longPressFired = false;
     node._pressingTimeout = setTimeout(() => {
       node.addClass('cy-node-pressing');
@@ -1331,7 +1334,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     // Build list of shows with at least 2 ungrouped writers
-    const originShowId = cy.nodes('.origin-show').id();
+    const originShowNode = cy.nodes('.origin-show').first();
+    const originShowId = originShowNode ? originShowNode.id() : null;
     const showList = Object.entries(showWriterMap)
       .map(([showId, writers]) => ({
         showId,
@@ -1341,7 +1345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }))
       .filter(item => item.count >= 2 && item.showId !== originShowId) // Exclude origin
       .sort((a, b) => b.count - a.count);
-
+  
     if (showList.length === 0) {
       dropdown.innerHTML = '<div class="dropdown-item" style="color:#888;">No shows with ≥2 writers</div>';
     } else {
@@ -1353,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     dropdown.style.display = 'block';
     setTimeout(() => dropdown.classList.add('open'), 10); // trigger animation
-
+  
     // Click handler for dropdown items
     dropdown.querySelectorAll('.dropdown-item[data-show]').forEach(item => {
       item.onclick = function(ev) {
